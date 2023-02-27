@@ -1,0 +1,29 @@
+[workspace]
+members = ["faust", "faust-traits"]
+
+[package]
+name = "faust-test-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cpal = "0.15"
+anyhow = "1"
+faust-traits = { version = "0.1", path = "faust-traits" }
+
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "interleave"
+harness = false
+
+[[bench]]
+name = "noise"
+harness = false
+
+[[bench]]
+name = "karplus"
+harness = false
