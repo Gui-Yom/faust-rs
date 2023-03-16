@@ -26,5 +26,5 @@ name = "noise"
 harness = false
 
 [[bench]]
-name = "karplus"
+name = "pitchshifter"
 harness = false
