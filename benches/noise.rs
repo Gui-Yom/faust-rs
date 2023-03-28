@@ -1,8 +1,6 @@
 //! Stereo LCG noise
 //! https://godbolt.org/z/f97zsj1jn
 
-use std::time::Instant;
-
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use criterion_polyglot::{BenchSpec, CriterionPolyglotExt};
 
@@ -29,7 +27,7 @@ fn noise_slice_chunked<const CHUNK_SIZE: usize>(
 ) {
     let [output0_, output1_] = outputs.map(|i| i.chunks_mut(CHUNK_SIZE));
     for (output0, output1) in output0_.zip(output1_) {
-        let mut tmp = last.map(|v| i32::wrapping_add(i32::wrapping_mul(1103515245, v), 12345));
+        let tmp = last.map(|v| i32::wrapping_add(i32::wrapping_mul(1103515245, v), 12345));
         let tmpf = tmp.map(|v| (v as f32) * 4.6566128e-12);
         output0.copy_from_slice(&tmpf);
         output1.copy_from_slice(&tmpf);
@@ -88,11 +86,90 @@ fn noise_array_chunked_vec<const CHUNK_SIZE: usize, const N: usize>(
 ) {
     let [output0_, output1_] = outputs.map(|i| i.chunks_mut(CHUNK_SIZE));
     for (output0, output1) in output0_.zip(output1_) {
-        let mut tmp = last.map(|v| i32::wrapping_add(i32::wrapping_mul(1103515245, v), 12345));
+        let tmp = last.map(|v| i32::wrapping_add(i32::wrapping_mul(1103515245, v), 12345));
         let tmpf = tmp.map(|v| (v as f32) * 4.6566128e-12);
         output0.copy_from_slice(&tmpf);
         output1.copy_from_slice(&tmpf);
         *last = tmp;
+    }
+}
+
+type F32 = f32;
+
+/// faust -lang rust -vec test2.dsp
+#[allow(non_snake_case)]
+#[allow(unused_mut)]
+#[inline(never)]
+fn noise_vec_faust(
+    mut iRec0_perm: [i32; 4],
+    count: i32,
+    inputs: &[&[F32]],
+    outputs: &mut [&mut [F32]],
+) {
+    let mut input0_ptr: &[F32] = inputs[0];
+    let mut output0_ptr: &mut [F32] = outputs[0];
+    let mut iRec0_tmp: [i32; 8] = [0; 8];
+    let mut vindex: i32 = 0;
+
+    /* Main loop */
+    for vindex in (0..=i32::wrapping_sub(count, 4)).step_by(4) {
+        let mut vsize: i32 = 4;
+        /* Recursive loop 0 */
+        /* Pre code */
+        for j0 in 0..4 {
+            iRec0_tmp[j0 as usize] = iRec0_perm[j0 as usize];
+        }
+        /* Compute code */
+        for i in 0..vsize {
+            iRec0_tmp[(i32::wrapping_add(4, i)) as usize] = i32::wrapping_add(
+                i32::wrapping_mul(
+                    1103515245,
+                    iRec0_tmp[(i32::wrapping_add(4, i32::wrapping_sub(i, 1))) as usize],
+                ),
+                12345,
+            );
+        }
+        /* Post code */
+        for j1 in 0..4 {
+            iRec0_perm[j1 as usize] = iRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
+        }
+        /* Vectorizable loop 1 */
+        /* Compute code */
+        for i in 0..vsize {
+            output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = input0_ptr
+                [(i32::wrapping_add(vindex, i)) as usize]
+                + 4.656613e-10 * ((iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32);
+        }
+    }
+    /* Remaining frames */
+    if vindex < count {
+        let mut vsize: i32 = i32::wrapping_sub(count, vindex);
+        /* Recursive loop 0 */
+        /* Pre code */
+        for j0 in 0..4 {
+            iRec0_tmp[j0 as usize] = iRec0_perm[j0 as usize];
+        }
+        /* Compute code */
+        for i in 0..vsize {
+            iRec0_tmp[(i32::wrapping_add(4, i)) as usize] = i32::wrapping_add(
+                i32::wrapping_mul(
+                    1103515245,
+                    iRec0_tmp[(i32::wrapping_add(4, i32::wrapping_sub(i, 1))) as usize],
+                ),
+                12345,
+            );
+        }
+        /* Post code */
+        for j1 in 0..4 {
+            iRec0_perm[j1 as usize] = iRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
+        }
+        /* Vectorizable loop 1 */
+        /* Compute code */
+        for i in 0..vsize {
+            output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = input0_ptr
+                [(i32::wrapping_add(vindex, i)) as usize]
+                + 4.656613e-10 * ((iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32);
+        }
     }
 }
 
@@ -105,7 +182,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     group.bench_function("slice", |b| {
         let mut last = 0;
-        b.iter(|| noise_slice(&mut last, [black_box(&mut buf0), black_box(&mut buf1)]))
+        b.iter(|| {
+            noise_slice(
+                black_box(&mut last),
+                [black_box(&mut buf0), black_box(&mut buf1)],
+            )
+        })
     });
 
     for chunk_size in [4, 8] {
@@ -117,13 +199,19 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     // Use different seeds or else we are just going to generate the same noise over 4 samples
                     let mut last = [0, 1, 2, 3];
                     b.iter(|| {
-                        noise_slice_chunked(&mut last, [black_box(&mut buf0), black_box(&mut buf1)])
+                        noise_slice_chunked(
+                            black_box(&mut last),
+                            [black_box(&mut buf0), black_box(&mut buf1)],
+                        )
                     })
                 }
                 8 => {
                     let mut last = [0, 1, 2, 3, 4, 5, 6, 7];
                     b.iter(|| {
-                        noise_slice_chunked(&mut last, [black_box(&mut buf0), black_box(&mut buf1)])
+                        noise_slice_chunked(
+                            black_box(&mut last),
+                            [black_box(&mut buf0), black_box(&mut buf1)],
+                        )
                     })
                 }
                 _ => {
@@ -135,7 +223,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     group.bench_function("array", |b| {
         let mut last = 0;
-        b.iter(|| noise_array(&mut last, [black_box(&mut buf0), black_box(&mut buf1)]))
+        b.iter(|| {
+            noise_array(
+                black_box(&mut last),
+                [black_box(&mut buf0), black_box(&mut buf1)],
+            )
+        })
     });
 
     for chunk_size in [4, 8] {
@@ -145,13 +238,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             |b, i| match i {
                 4 => b.iter(|| {
                     noise_array_chunked::<4, SIZE>(
-                        &mut 0,
+                        black_box(&mut 0),
                         [black_box(&mut buf0), black_box(&mut buf1)],
                     )
                 }),
                 8 => b.iter(|| {
                     noise_array_chunked::<8, SIZE>(
-                        &mut 0,
+                        black_box(&mut 0),
                         [black_box(&mut buf0), black_box(&mut buf1)],
                     )
                 }),
@@ -172,7 +265,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     let mut last = [0, 1, 2, 3];
                     b.iter(|| {
                         noise_array_chunked_vec(
-                            &mut last,
+                            black_box(&mut last),
                             [black_box(&mut buf0), black_box(&mut buf1)],
                         )
                     })
@@ -181,7 +274,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     let mut last = [0, 1, 2, 3, 4, 5, 6, 7];
                     b.iter(|| {
                         noise_array_chunked_vec(
-                            &mut last,
+                            black_box(&mut last),
                             [black_box(&mut buf0), black_box(&mut buf1)],
                         )
                     })
@@ -192,6 +285,18 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             },
         );
     }
+
+    group.bench_function("vec faust", |b| {
+        let acc = [0; 4];
+        b.iter(|| {
+            noise_vec_faust(
+                black_box(acc),
+                black_box(SIZE as i32),
+                black_box(&[&buf0]),
+                black_box(&mut [&mut buf1]),
+            )
+        })
+    });
 
     group.c_benchmark_with_builder(
         "c scalar",

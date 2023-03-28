@@ -2,9 +2,13 @@
 //! https://godbolt.org/z/bbM8jPhPf
 
 use std::hint::black_box;
+use std::ops::Rem;
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 
+type F32 = f32;
+
+#[allow(non_snake_case)]
 pub struct mydsp {
     fHslider0: f32,
     fHslider1: f32,
@@ -26,6 +30,7 @@ impl mydsp {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline(never)]
     fn compute_original(&mut self, count: i32, inputs: &[&[f32]], outputs: &mut [&mut [f32]]) {
         let inputs0 = if let [inputs0, ..] = inputs {
@@ -82,6 +87,7 @@ impl mydsp {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline(never)]
     fn compute_slice(&mut self, input: &[f32], output: &mut [f32]) {
         let fSlow0 = f32::powf(2.0, 0.083333336 * self.fHslider0);
@@ -125,6 +131,7 @@ impl mydsp {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline(never)]
     fn compute_arr<const N: usize>(&mut self, input: &[f32; N], output: &mut [f32; N]) {
         let fSlow0 = f32::powf(2.0, 0.083333336 * self.fHslider0);
@@ -169,6 +176,7 @@ impl mydsp {
     }
 }
 
+#[allow(non_snake_case)]
 pub struct mydsp_vec {
     fHslider0: f32,
     fHslider1: f32,
@@ -194,388 +202,221 @@ impl mydsp_vec {
         }
     }
 
+    #[allow(non_snake_case)]
     #[inline(never)]
     fn compute_original(&mut self, count: i32, inputs: &[&[f32]], outputs: &mut [&mut [f32]]) {
-        let mut input0_ptr = inputs[0];
-        let mut output0_ptr = outputs[0];
-        let mut fSlow0: f32 = f32::powf(2.0, 0.083333336 * self.fHslider0);
-        let mut fSlow1: f32 = self.fHslider1;
-        let mut fRec0_tmp: [f32; 36] = [0.0; 36];
-        let mut fRec0 = &mut fRec0_tmp[..4];
-        let mut fSlow2: f32 = 1.0 / self.fHslider2;
-        let mut fZec0: [f32; 32] = [0.0; 32];
-        let mut fZec1: [f32; 32] = [0.0; 32];
-        let mut iZec2: [i32; 32] = [0; 32];
-        let mut fZec3: [f32; 32] = [0.0; 32];
-        let mut fZec4: [f32; 32] = [0.0; 32];
-        let mut iZec5: [i32; 32] = [0; 32];
-        let mut fZec6: [f32; 32] = [0.0; 32];
-        let mut vindex: i32 = 0;
+        let mut input0_ptr: &[F32] = inputs[0];
+        let mut output0_ptr: &mut [F32] = outputs[0];
+        let mut fSlow0: F32 = F32::powf(2.0, 0.083333336 * self.fHslider0);
+        let mut fSlow1: F32 = self.fHslider1;
+        let mut fRec0_tmp: [F32; 8] = [0.0; 8];
+        let mut fSlow2: F32 = 1.0 / self.fHslider2;
+        let mut fZec0: [F32; 4] = [0.0; 4];
+        let mut fZec1: [F32; 4] = [0.0; 4];
+        let mut iZec2: [i32; 4] = [0; 4];
+        let mut fZec3: [F32; 4] = [0.0; 4];
+        let mut fZec4: [F32; 4] = [0.0; 4];
+        let mut iZec5: [i32; 4] = [0; 4];
+        let mut fZec6: [F32; 4] = [0.0; 4];
+        let mut vindex: i32 = count / 4 * 4;
         /* Main loop */
-        vindex = 0;
-        loop {
-            let mut input0 = &input0_ptr[(vindex) as usize];
-            let mut output0 = &mut output0_ptr[(vindex) as usize];
-            let mut vsize: i32 = 32;
+        for vindex in (0..=i32::wrapping_sub(count, 4)).step_by(4) {
+            let mut vsize: i32 = 4;
             /* Recursive loop 0 */
             /* Pre code */
-            let mut j0: i32 = 0;
-            loop {
-                fRec0_tmp[(j0) as usize] = self.fRec0_perm[(j0) as usize];
-                j0 = i32::wrapping_add(j0, 1);
-                if j0 < 4 {
-                    continue;
-                } else {
-                    break;
-                }
+            for j0 in 0..4 {
+                fRec0_tmp[j0 as usize] = self.fRec0_perm[j0 as usize];
             }
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fRec0[(i) as usize] =
-                    (fSlow1 + (fRec0[(i32::wrapping_sub(i, 1)) as usize] + 1.0 - fSlow0)) % fSlow1;
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fRec0_tmp[(i32::wrapping_add(4, i)) as usize] = (fSlow1
+                    + (fRec0_tmp[(i32::wrapping_add(4, i32::wrapping_sub(i, 1))) as usize] + 1.0
+                        - fSlow0))
+                    % fSlow1;
             }
             /* Post code */
-            let mut j1: i32 = 0;
-            loop {
-                self.fRec0_perm[(j1) as usize] = fRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
-                j1 = i32::wrapping_add(j1, 1);
-                if j1 < 4 {
-                    continue;
-                } else {
-                    break;
-                }
+            for j1 in 0..4 {
+                self.fRec0_perm[j1 as usize] = fRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
             }
             /* Vectorizable loop 1 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec1[(i) as usize] = fSlow1 + fRec0[(i) as usize];
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec1[i as usize] = fSlow1 + fRec0_tmp[(i32::wrapping_add(4, i)) as usize];
             }
             /* Vectorizable loop 2 */
+            /* Compute code */
+            for i in 0..vsize {
+                fZec0[i as usize] =
+                    F32::min(fSlow2 * fRec0_tmp[(i32::wrapping_add(4, i)) as usize], 1.0);
+            }
+            /* Vectorizable loop 3 */
+            /* Compute code */
+            for i in 0..vsize {
+                iZec2[i as usize] = ((fZec1[i as usize]) as i32);
+            }
+            /* Vectorizable loop 4 */
             /* Pre code */
             self.fYec0_idx = (i32::wrapping_add(self.fYec0_idx, self.fYec0_idx_save)) & 131071;
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                self.fYec0[((i32::wrapping_add(i, self.fYec0_idx)) & 131071) as usize] = *input0;
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                self.fYec0[((i32::wrapping_add(i, self.fYec0_idx)) & 131071) as usize] =
+                    input0_ptr[(i32::wrapping_add(vindex, i)) as usize];
             }
             /* Post code */
             self.fYec0_idx_save = vsize;
-            /* Vectorizable loop 3 */
-            /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                iZec2[(i) as usize] = ((fZec1[(i) as usize]) as i32);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-            /* Vectorizable loop 4 */
-            /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec0[(i) as usize] = f32::min(fSlow2 * fRec0[(i) as usize], 1.0);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
-            }
             /* Vectorizable loop 5 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec4[(i) as usize] = 1.0 - fRec0[(i) as usize];
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec3[i as usize] = F32::floor(fZec1[i as usize]);
             }
             /* Vectorizable loop 6 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec6[(i) as usize] = f32::floor(fRec0[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                iZec5[i as usize] = ((fRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as i32);
             }
             /* Vectorizable loop 7 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec3[(i) as usize] = f32::floor(fZec1[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec6[i as usize] = F32::floor(fRec0_tmp[(i32::wrapping_add(4, i)) as usize]);
             }
             /* Vectorizable loop 8 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                iZec5[(i) as usize] = ((fRec0[(i) as usize]) as i32);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec4[i as usize] = 1.0 - fRec0_tmp[(i32::wrapping_add(4, i)) as usize];
             }
             /* Vectorizable loop 9 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                *output0 = (self.fYec0[((i32::wrapping_sub(
-                    i32::wrapping_add(i, self.fYec0_idx),
-                    std::cmp::min(65537, std::cmp::max(0, iZec5[(i) as usize])),
-                )) & 131071) as usize]
-                    * (fZec6[(i) as usize] + fZec4[(i) as usize])
-                    + (fRec0[(i) as usize] - fZec6[(i) as usize])
+            for i in 0..vsize {
+                output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = (self.fYec0
+                    [((i32::wrapping_sub(
+                        i32::wrapping_add(i, self.fYec0_idx),
+                        std::cmp::min(65537, std::cmp::max(0, iZec5[i as usize])),
+                    )) & 131071) as usize]
+                    * (fZec6[i as usize] + fZec4[i as usize])
+                    + (fRec0_tmp[(i32::wrapping_add(4, i)) as usize] - fZec6[i as usize])
                         * self.fYec0[((i32::wrapping_sub(
                             i32::wrapping_add(i, self.fYec0_idx),
                             std::cmp::min(
                                 65537,
-                                std::cmp::max(0, i32::wrapping_add(iZec5[(i) as usize], 1)),
+                                std::cmp::max(0, i32::wrapping_add(iZec5[i as usize], 1)),
                             ),
                         )) & 131071) as usize])
-                    * fZec0[(i) as usize]
+                    * fZec0[i as usize]
                     + (self.fYec0[((i32::wrapping_sub(
                         i32::wrapping_add(i, self.fYec0_idx),
-                        std::cmp::min(65537, std::cmp::max(0, iZec2[(i) as usize])),
+                        std::cmp::min(65537, std::cmp::max(0, iZec2[i as usize])),
                     )) & 131071) as usize]
-                        * (fZec3[(i) as usize] + fZec4[(i) as usize] - fSlow1)
-                        + (fSlow1 + (fRec0[(i) as usize] - fZec3[(i) as usize]))
+                        * (fZec3[i as usize] + fZec4[i as usize] - fSlow1)
+                        + (fSlow1
+                            + (fRec0_tmp[(i32::wrapping_add(4, i)) as usize] - fZec3[i as usize]))
                             * self.fYec0[((i32::wrapping_sub(
                                 i32::wrapping_add(i, self.fYec0_idx),
                                 std::cmp::min(
                                     65537,
-                                    std::cmp::max(0, i32::wrapping_add(iZec2[(i) as usize], 1)),
+                                    std::cmp::max(0, i32::wrapping_add(iZec2[i as usize], 1)),
                                 ),
                             )) & 131071) as usize])
-                        * (1.0 - fZec0[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-            vindex = i32::wrapping_add(vindex, 32);
-            if vindex <= i32::wrapping_sub(count, 32) {
-                continue;
-            } else {
-                break;
+                        * (1.0 - fZec0[i as usize]);
             }
         }
         /* Remaining frames */
-        if (((vindex < count) as i32) as i32 == 1) {
-            let mut input0: &f32 = &input0_ptr[(vindex) as usize];
-            let mut output0: &mut f32 = &mut output0_ptr[(vindex) as usize];
+        if vindex < count {
             let mut vsize: i32 = i32::wrapping_sub(count, vindex);
             /* Recursive loop 0 */
             /* Pre code */
-            let mut j0: i32 = 0;
-            loop {
-                fRec0_tmp[(j0) as usize] = self.fRec0_perm[(j0) as usize];
-                j0 = i32::wrapping_add(j0, 1);
-                if j0 < 4 {
-                    continue;
-                } else {
-                    break;
-                }
+            for j0 in 0..4 {
+                fRec0_tmp[j0 as usize] = self.fRec0_perm[j0 as usize];
             }
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fRec0[(i) as usize] =
-                    (fSlow1 + (fRec0[(i32::wrapping_sub(i, 1)) as usize] + 1.0 - fSlow0)) % fSlow1;
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fRec0_tmp[(i32::wrapping_add(4, i)) as usize] = (fSlow1
+                    + (fRec0_tmp[(i32::wrapping_add(4, i32::wrapping_sub(i, 1))) as usize] + 1.0
+                        - fSlow0))
+                    % fSlow1;
             }
             /* Post code */
-            let mut j1: i32 = 0;
-            loop {
-                self.fRec0_perm[(j1) as usize] = fRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
-                j1 = i32::wrapping_add(j1, 1);
-                if j1 < 4 {
-                    continue;
-                } else {
-                    break;
-                }
+            for j1 in 0..4 {
+                self.fRec0_perm[j1 as usize] = fRec0_tmp[(i32::wrapping_add(vsize, j1)) as usize];
             }
             /* Vectorizable loop 1 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec1[(i) as usize] = fSlow1 + fRec0[(i) as usize];
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec1[i as usize] = fSlow1 + fRec0_tmp[(i32::wrapping_add(4, i)) as usize];
             }
             /* Vectorizable loop 2 */
+            /* Compute code */
+            for i in 0..vsize {
+                fZec0[i as usize] =
+                    F32::min(fSlow2 * fRec0_tmp[(i32::wrapping_add(4, i)) as usize], 1.0);
+            }
+            /* Vectorizable loop 3 */
+            /* Compute code */
+            for i in 0..vsize {
+                iZec2[i as usize] = ((fZec1[i as usize]) as i32);
+            }
+            /* Vectorizable loop 4 */
             /* Pre code */
             self.fYec0_idx = (i32::wrapping_add(self.fYec0_idx, self.fYec0_idx_save)) & 131071;
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                self.fYec0[((i32::wrapping_add(i, self.fYec0_idx)) & 131071) as usize] = *input0;
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                self.fYec0[((i32::wrapping_add(i, self.fYec0_idx)) & 131071) as usize] =
+                    input0_ptr[(i32::wrapping_add(vindex, i)) as usize];
             }
             /* Post code */
             self.fYec0_idx_save = vsize;
-            /* Vectorizable loop 3 */
-            /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                iZec2[(i) as usize] = ((fZec1[(i) as usize]) as i32);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
-            }
-            /* Vectorizable loop 4 */
-            /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec0[(i) as usize] = f32::min(fSlow2 * fRec0[(i) as usize], 1.0);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
-            }
             /* Vectorizable loop 5 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec4[(i) as usize] = 1.0 - fRec0[(i) as usize];
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec3[i as usize] = F32::floor(fZec1[i as usize]);
             }
             /* Vectorizable loop 6 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec6[(i) as usize] = f32::floor(fRec0[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                iZec5[i as usize] = ((fRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as i32);
             }
             /* Vectorizable loop 7 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                fZec3[(i) as usize] = f32::floor(fZec1[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec6[i as usize] = F32::floor(fRec0_tmp[(i32::wrapping_add(4, i)) as usize]);
             }
             /* Vectorizable loop 8 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                iZec5[(i) as usize] = ((fRec0[(i) as usize]) as i32);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+            for i in 0..vsize {
+                fZec4[i as usize] = 1.0 - fRec0_tmp[(i32::wrapping_add(4, i)) as usize];
             }
             /* Vectorizable loop 9 */
             /* Compute code */
-            let mut i: i32 = 0;
-            loop {
-                *output0 = (self.fYec0[((i32::wrapping_sub(
-                    i32::wrapping_add(i, self.fYec0_idx),
-                    std::cmp::min(65537, std::cmp::max(0, iZec5[(i) as usize])),
-                )) & 131071) as usize]
-                    * (fZec6[(i) as usize] + fZec4[(i) as usize])
-                    + (fRec0[(i) as usize] - fZec6[(i) as usize])
+            for i in 0..vsize {
+                output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = (self.fYec0
+                    [((i32::wrapping_sub(
+                        i32::wrapping_add(i, self.fYec0_idx),
+                        std::cmp::min(65537, std::cmp::max(0, iZec5[i as usize])),
+                    )) & 131071) as usize]
+                    * (fZec6[i as usize] + fZec4[i as usize])
+                    + (fRec0_tmp[(i32::wrapping_add(4, i)) as usize] - fZec6[i as usize])
                         * self.fYec0[((i32::wrapping_sub(
                             i32::wrapping_add(i, self.fYec0_idx),
                             std::cmp::min(
                                 65537,
-                                std::cmp::max(0, i32::wrapping_add(iZec5[(i) as usize], 1)),
+                                std::cmp::max(0, i32::wrapping_add(iZec5[i as usize], 1)),
                             ),
                         )) & 131071) as usize])
-                    * fZec0[(i) as usize]
+                    * fZec0[i as usize]
                     + (self.fYec0[((i32::wrapping_sub(
                         i32::wrapping_add(i, self.fYec0_idx),
-                        std::cmp::min(65537, std::cmp::max(0, iZec2[(i) as usize])),
+                        std::cmp::min(65537, std::cmp::max(0, iZec2[i as usize])),
                     )) & 131071) as usize]
-                        * (fZec3[(i) as usize] + fZec4[(i) as usize] - fSlow1)
-                        + (fSlow1 + (fRec0[i as usize] - fZec3[(i) as usize]))
+                        * (fZec3[i as usize] + fZec4[i as usize] - fSlow1)
+                        + (fSlow1
+                            + (fRec0_tmp[(i32::wrapping_add(4, i)) as usize] - fZec3[i as usize]))
                             * self.fYec0[((i32::wrapping_sub(
                                 i32::wrapping_add(i, self.fYec0_idx),
                                 std::cmp::min(
                                     65537,
-                                    std::cmp::max(0, i32::wrapping_add(iZec2[(i) as usize], 1)),
+                                    std::cmp::max(0, i32::wrapping_add(iZec2[i as usize], 1)),
                                 ),
                             )) & 131071) as usize])
-                        * (1.0 - fZec0[(i) as usize]);
-                i = i32::wrapping_add(i, 1);
-                if i < vsize {
-                    continue;
-                } else {
-                    break;
-                }
+                        * (1.0 - fZec0[i as usize]);
             }
         }
     }
