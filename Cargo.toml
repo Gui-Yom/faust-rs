@@ -14,6 +14,7 @@ anyhow = "1"
 faust-traits = { version = "0.1", path = "faust-traits" }
 
 [dev-dependencies]
+default-boxed = "0.2"
 criterion = { version = "0.4", features = ["html_reports"] }
 criterion-polyglot = { version = "0.1", path = "C:/Code/Rust/criterion-polyglot" }
 
@@ -35,6 +36,10 @@ harness = false
 
 [[bench]]
 name = "rms"
+harness = false
+
+[[bench]]
+name = "karplus"
 harness = false
 
 [[bench]]
