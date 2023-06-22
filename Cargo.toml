@@ -38,7 +38,19 @@ path = "src/main.rs"
 bench = false
 
 [[bench]]
+name = "copy"
+harness = false
+
+[[bench]]
+name = "freeverb"
+harness = false
+
+[[bench]]
 name = "interleave"
+harness = false
+
+[[bench]]
+name = "karplus32"
 harness = false
 
 [[bench]]
@@ -50,17 +62,5 @@ name = "pitchshifter"
 harness = false
 
 [[bench]]
-name = "copy"
-harness = false
-
-[[bench]]
 name = "rms"
-harness = false
-
-[[bench]]
-name = "karplus32"
-harness = false
-
-[[bench]]
-name = "test"
 harness = false

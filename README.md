@@ -57,3 +57,10 @@ RUSTFLAGS="-C target-cpu=native" cargo bench --bench noise -- --baseline cpu
 The benchmarks also measure the equivalent generated C code.
 
 ***TODO** define a set of optimal compilation parameters for different C compilers*
+
+### Results
+
+| Benchmark | scalar                                         | vec/4                                         |
+|-----------|------------------------------------------------|-----------------------------------------------|
+| freeverb  | 349.49 µs (reprC -68%, native +13%, both -69%) | 133.14 µs (reprC -4%, native -23%, both -34%) |
+
