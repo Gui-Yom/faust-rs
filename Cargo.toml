@@ -15,8 +15,27 @@ faust-traits = { version = "0.1", path = "faust-traits" }
 
 [dev-dependencies]
 default-boxed = "0.2"
-criterion = { version = "0.4", features = ["html_reports"] }
-criterion-polyglot = { version = "0.1", path = "C:/Code/Rust/criterion-polyglot" }
+criterion = { version = "0.5", features = ["html_reports"] }
+#criterion-polyglot = { version = "0.1", path = "C:/Code/Rust/criterion-polyglot" }
+
+[features]
+default = ["default-boxed"]
+default-boxed = []
+reprc = []
+
+[profile.release]
+opt-level = 3
+# No lto for cargo asm
+lto = false
+codegen-units = 8
+
+[lib]
+bench = false
+
+[[bin]]
+name = "faust-test-rs"
+path = "src/main.rs"
+bench = false
 
 [[bench]]
 name = "interleave"
@@ -39,7 +58,7 @@ name = "rms"
 harness = false
 
 [[bench]]
-name = "karplus"
+name = "karplus32"
 harness = false
 
 [[bench]]

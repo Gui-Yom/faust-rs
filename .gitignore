@@ -3,3 +3,4 @@ Cargo.lock
 .idea/
 bench-baseline/
 bench-native/
+pgo-data/

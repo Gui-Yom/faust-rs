@@ -2,11 +2,12 @@
 
 use std::hint::black_box;
 
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 type F32 = f32;
 
 #[allow(non_snake_case)]
+#[cfg_attr(feature = "reprc", repr(C))]
 struct mydsp {
     IOTA0: i32,
     iVec0: [i32; 1024],
@@ -41,19 +42,26 @@ impl mydsp {
         };
         let zipped_iterators = inputs0.zip(outputs0);
         for (input0, output0) in zipped_iterators {
-            let mut iTemp0: i32 = ((1048576.0 * input0 * input0) as i32);
+            let mut iTemp0: i32 = (1048576.0 * mydsp_faustpower2_f(*input0)) as i32;
             self.iVec0[(self.IOTA0 & 1023) as usize] = iTemp0;
             self.iRec0[0] = i32::wrapping_sub(
                 i32::wrapping_add(self.iRec0[1], iTemp0),
                 self.iVec0[((i32::wrapping_sub(self.IOTA0, 1000)) & 1023) as usize],
             );
-            *output0 = F32::sqrt(9.536744e-10 * ((self.iRec0[0]) as F32));
+            *output0 = F32::sqrt(9.536744e-10 * (self.iRec0[0]) as F32);
             self.IOTA0 = i32::wrapping_add(self.IOTA0, 1);
             self.iRec0[1] = self.iRec0[0];
         }
     }
 }
 
+#[inline(always)]
+fn mydsp_faustpower2_f(value: F32) -> F32 {
+    return value * value;
+}
+
+#[cfg_attr(feature = "reprc", repr(C))]
+#[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 struct mydsp_vec {
     iYec0: [i32; 2048],
@@ -77,27 +85,31 @@ impl mydsp_vec {
     #[allow(non_snake_case)]
     #[allow(unused_mut)]
     #[inline(never)]
-    fn rms_faust_vec<const CHUNK_SIZE: i32>(
-        &mut self,
-        count: i32,
-        inputs: &[&[F32]],
-        outputs: &mut [&mut [F32]],
-    ) {
-        let mut input0_ptr: &[F32] = inputs[0];
-        let mut output0_ptr: &mut [F32] = outputs[0];
-        let mut iRec0_tmp: [i32; 36] = [0; 36];
-        let mut vindex: i32 = count / CHUNK_SIZE * CHUNK_SIZE;
+    fn compute_original_4(&mut self, count: i32, inputs: &[&[F32]], outputs: &mut [&mut [F32]]) {
+        const vsize: i32 = 4;
+        let (inputs0) = if let [inputs0, ..] = inputs {
+            let inputs0 = inputs0[..count as usize].chunks(vsize as usize);
+            (inputs0)
+        } else {
+            panic!("wrong number of inputs");
+        };
+        let (outputs0) = if let [outputs0, ..] = outputs {
+            let outputs0 = outputs0[..count as usize].chunks_mut(vsize as usize);
+            (outputs0)
+        } else {
+            panic!("wrong number of outputs");
+        };
+        let mut iRec0_tmp: [i32; 8] = [0; 8];
         /* Main loop */
-        for vindex in (0..=i32::wrapping_sub(count, CHUNK_SIZE)).step_by(CHUNK_SIZE as usize) {
-            let mut vsize: i32 = CHUNK_SIZE;
+        let zipped_iterators = inputs0.zip(outputs0);
+        for (input0, output0) in zipped_iterators {
             /* Vectorizable loop 0 */
             /* Pre code */
-            self.iYec0_idx = (i32::wrapping_add(self.iYec0_idx, self.iYec0_idx_save)) & 2047;
+            self.iYec0_idx = (i32::wrapping_add(self.iYec0_idx, self.iYec0_idx_save)) & 1023;
             /* Compute code */
             for i in 0..vsize {
-                let tmp = input0_ptr[(i32::wrapping_add(vindex, i)) as usize];
-                self.iYec0[((i32::wrapping_add(i, self.iYec0_idx)) & 2047) as usize] =
-                    ((1048576.0 * tmp * tmp) as i32);
+                self.iYec0[((i32::wrapping_add(i, self.iYec0_idx)) & 1023) as usize] =
+                    (1048576.0 * mydsp_faustpower2_f(input0[i as usize])) as i32;
             }
             /* Post code */
             self.iYec0_idx_save = vsize;
@@ -111,10 +123,10 @@ impl mydsp_vec {
                 iRec0_tmp[(i32::wrapping_add(4, i)) as usize] = i32::wrapping_sub(
                     i32::wrapping_add(
                         iRec0_tmp[(i32::wrapping_add(4, i32::wrapping_sub(i, 1))) as usize],
-                        self.iYec0[((i32::wrapping_add(i, self.iYec0_idx)) & 2047) as usize],
+                        self.iYec0[((i32::wrapping_add(i, self.iYec0_idx)) & 1023) as usize],
                     ),
                     self.iYec0[((i32::wrapping_sub(i32::wrapping_add(i, self.iYec0_idx), 1000))
-                        & 2047) as usize],
+                        & 1023) as usize],
                 );
             }
             /* Post code */
@@ -124,22 +136,41 @@ impl mydsp_vec {
             /* Vectorizable loop 2 */
             /* Compute code */
             for i in 0..vsize {
-                output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = F32::sqrt(
-                    9.536744e-10 * ((iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32),
+                output0[i as usize] = F32::sqrt(
+                    9.536744e-10 * (iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32,
                 );
             }
         }
-        /* Remaining frames */
-        if vindex < count {
-            let mut vsize: i32 = i32::wrapping_sub(count, vindex);
+    }
+
+    #[allow(non_snake_case)]
+    #[allow(unused_mut)]
+    #[inline(never)]
+    fn compute_original_32(&mut self, count: i32, inputs: &[&[F32]], outputs: &mut [&mut [F32]]) {
+        const vsize: i32 = 32;
+        let (inputs0) = if let [inputs0, ..] = inputs {
+            let inputs0 = inputs0[..count as usize].chunks(vsize as usize);
+            (inputs0)
+        } else {
+            panic!("wrong number of inputs");
+        };
+        let (outputs0) = if let [outputs0, ..] = outputs {
+            let outputs0 = outputs0[..count as usize].chunks_mut(vsize as usize);
+            (outputs0)
+        } else {
+            panic!("wrong number of outputs");
+        };
+        let mut iRec0_tmp: [i32; 36] = [0; 36];
+        /* Main loop */
+        let zipped_iterators = inputs0.zip(outputs0);
+        for (input0, output0) in zipped_iterators {
             /* Vectorizable loop 0 */
             /* Pre code */
             self.iYec0_idx = (i32::wrapping_add(self.iYec0_idx, self.iYec0_idx_save)) & 2047;
             /* Compute code */
             for i in 0..vsize {
-                let tmp = input0_ptr[(i32::wrapping_add(vindex, i)) as usize];
                 self.iYec0[((i32::wrapping_add(i, self.iYec0_idx)) & 2047) as usize] =
-                    ((1048576.0 * tmp * tmp) as i32);
+                    (1048576.0 * mydsp_faustpower2_f(input0[i as usize])) as i32;
             }
             /* Post code */
             self.iYec0_idx_save = vsize;
@@ -166,8 +197,8 @@ impl mydsp_vec {
             /* Vectorizable loop 2 */
             /* Compute code */
             for i in 0..vsize {
-                output0_ptr[(i32::wrapping_add(vindex, i)) as usize] = F32::sqrt(
-                    9.536744e-10 * ((iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32),
+                output0[i as usize] = F32::sqrt(
+                    9.536744e-10 * (iRec0_tmp[(i32::wrapping_add(4, i)) as usize]) as F32,
                 );
             }
         }
@@ -182,7 +213,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let buf0 = [0.0; SIZE];
     let mut buf1 = [0.0; SIZE];
 
-    group.bench_function("faust linear", |b| {
+    group.bench_function("original linear", |b| {
         b.iter(|| {
             black_box(mydsp::rms_faust(
                 black_box(&mut dsp),
@@ -194,32 +225,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let mut dsp_vec = mydsp_vec::new();
-
-    group.bench_function("faust vec/4", |b| {
+    group.bench_with_input(BenchmarkId::new("original vec", 4), &4, |b, i| {
         b.iter(|| {
-            black_box(mydsp_vec::rms_faust_vec::<4>(
+            black_box(mydsp_vec::compute_original_4(
                 black_box(&mut dsp_vec),
-                black_box(SIZE as i32),
+                black_box(4096),
                 black_box(&[&buf0]),
                 black_box(&mut [&mut buf1]),
             ))
         })
     });
-    group.bench_function("faust vec/8", |b| {
+    group.bench_with_input(BenchmarkId::new("original vec", 32), &32, |b, i| {
         b.iter(|| {
-            black_box(mydsp_vec::rms_faust_vec::<8>(
+            black_box(mydsp_vec::compute_original_32(
                 black_box(&mut dsp_vec),
-                black_box(SIZE as i32),
-                black_box(&[&buf0]),
-                black_box(&mut [&mut buf1]),
-            ))
-        })
-    });
-    group.bench_function("faust vec/32", |b| {
-        b.iter(|| {
-            black_box(mydsp_vec::rms_faust_vec::<32>(
-                black_box(&mut dsp_vec),
-                black_box(SIZE as i32),
+                black_box(4096),
                 black_box(&[&buf0]),
                 black_box(&mut [&mut buf1]),
             ))
