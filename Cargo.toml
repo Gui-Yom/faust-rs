@@ -27,14 +27,9 @@ reprc = []
 opt-level = 3
 # No lto for cargo asm
 lto = false
-codegen-units = 8
+codegen-units = 1
 
 [lib]
-bench = false
-
-[[bin]]
-name = "faust-test-rs"
-path = "src/main.rs"
 bench = false
 
 [[bench]]

@@ -34,6 +34,23 @@ karplus32/original vec/4  time:   [192.18 µs 192.45 µs 192.78 µs]
 Judging by this example, using `repr(C)` or not isn't evident. The impact on performance is similar (relatively) when
 compiling for a native cpu.
 
+Another one, this time on a Raspberry Pi 4 :
+
+```text
+freeverb/scalar         time:   [846.00 µs 846.49 µs 846.98 µs]
+                        thrpt:  [4.8360 Melem/s 4.8388 Melem/s 4.8416 Melem/s]
+                 change:
+                        time:   [+11.767% +11.881% +11.988%] (p = 0.00 < 0.05)
+                        thrpt:  [-10.705% -10.620% -10.528%]
+                        Performance has regressed.
+freeverb/vec/4          time:   [566.30 µs 566.43 µs 566.59 µs]
+                        thrpt:  [7.2292 Melem/s 7.2313 Melem/s 7.2330 Melem/s]
+                 change:
+                        time:   [+14.405% +14.481% +14.545%] (p = 0.00 < 0.05)
+                        thrpt:  [-12.698% -12.649% -12.591%]
+                        Performance has regressed.
+```
+
 ### The effect of `-C target-cpu=native`
 
 ```shell
